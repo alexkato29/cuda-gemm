@@ -1,3 +1,4 @@
+#include <iostream>
 #include <vector>
 #include <cstdlib>
 #include <cuda_runtime.h>
@@ -15,25 +16,26 @@ static inline void checkCuda(cudaError_t e) {
 }
 
 float benchmark_kernel(int N, float alpha, float beta) {
-	const int SIZE = N * N * sizeof(float);
+	const int SIZE = N * N;
+	const int BYTES = SIZE * sizeof(float);
 
 	float *h_A = nullptr, *h_B = nullptr, *h_C = nullptr;
-	checkCuda(cudaMallocHost(&h_A, SIZE));
-	checkCuda(cudaMallocHost(&h_B, SIZE));
-	checkCuda(cudaMallocHost(&h_C, SIZE));
+	checkCuda(cudaMallocHost(&h_A, BYTES));
+	checkCuda(cudaMallocHost(&h_B, BYTES));
+	checkCuda(cudaMallocHost(&h_C, BYTES));
 
 	generate_matrix(h_A, SIZE);
 	generate_matrix(h_B, SIZE);
 	generate_matrix(h_C, SIZE);
 
 	float *d_A = nullptr, *d_B = nullptr, *d_C = nullptr;
-	checkCuda(cudaMalloc(&d_A, SIZE));
-    checkCuda(cudaMalloc(&d_B, SIZE));
-    checkCuda(cudaMalloc(&d_C, SIZE));
+	checkCuda(cudaMalloc(&d_A, BYTES));
+    checkCuda(cudaMalloc(&d_B, BYTES));
+    checkCuda(cudaMalloc(&d_C, BYTES));
 
-    checkCuda(cudaMemcpy(d_A, h_A, SIZE, cudaMemcpyHostToDevice));
-    checkCuda(cudaMemcpy(d_B, h_B, SIZE, cudaMemcpyHostToDevice));
-    checkCuda(cudaMemcpy(d_C, h_C, SIZE, cudaMemcpyHostToDevice));
+    checkCuda(cudaMemcpy(d_A, h_A, BYTES, cudaMemcpyHostToDevice));
+    checkCuda(cudaMemcpy(d_B, h_B, BYTES, cudaMemcpyHostToDevice));
+    checkCuda(cudaMemcpy(d_C, h_C, BYTES, cudaMemcpyHostToDevice));
 
     cudaEvent_t start, stop;
     checkCuda(cudaEventCreate(&start));
