@@ -88,9 +88,10 @@ int main() {
 		float runtime = benchmark_kernel(N, 1.0f, 1.0f);
 		kernel_results.push_back(runtime);
 	}
-
+	
+	printf("Average Runtime per Matrix Size:\n");
 	for (int i = 0; i < kernel_results.size(); i++) {
-		printf("%dx%d Matrix: %f ms (average)\n", sizes[i], sizes[i], kernel_results[i]);
+		printf("%dx%d Matrix: %f ms\n", sizes[i], sizes[i], kernel_results[i]);
 	}
 
 	return 0;
