@@ -33,7 +33,14 @@ add_executable(benchmark
 target_link_libraries(benchmark PRIVATE utils)
 target_include_directories(benchmark PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
+find_package(CUDAToolkit REQUIRED)
 if(KERNEL STREQUAL "cublas")
-    find_package(CUDAToolkit REQUIRED)
     target_link_libraries(benchmark PRIVATE CUDA::cublas)
 endif()
+
+add_executable(validate
+    tests/validate.cu
+    ${KERNEL_FILE}
+)
+target_link_libraries(validate PRIVATE utils CUDA::cublas)
+target_include_directories(validate PRIVATE ${PROJECT_SOURCE_DIR}/include)
