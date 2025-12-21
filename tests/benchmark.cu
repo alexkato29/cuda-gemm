@@ -63,6 +63,8 @@ float benchmark_kernel(int N, float alpha, float beta) {
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
+    cleanup_kernel();
+
     cudaFree(d_A);
     cudaFree(d_B);
     cudaFree(d_C);
@@ -83,12 +85,13 @@ int main() {
 	kernel_results.reserve(sizes.size());
 
 	for (int N : sizes) {
-		float runtime = benchmark_kernel(N, 1.0f, 0.0f);
+		float runtime = benchmark_kernel(N, 1.0f, 1.0f);
 		kernel_results.push_back(runtime);
 	}
-
+	
+	printf("Average Runtime per Matrix Size:\n");
 	for (int i = 0; i < kernel_results.size(); i++) {
-		printf("%dx%d Matrix: %f ms (average)\n", sizes[i], sizes[i], kernel_results[i]);
+		printf("%dx%d Matrix: %f ms\n", sizes[i], sizes[i], kernel_results[i]);
 	}
 
 	return 0;
