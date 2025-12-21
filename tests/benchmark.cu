@@ -6,7 +6,7 @@
 #include "utils/generate_matrix.cuh"
 #include "kernel.cuh"
 
-#define N_SAMPLES 10
+#define N_SAMPLES 30
 
 
 static inline void checkCuda(cudaError_t e) {
@@ -51,7 +51,7 @@ float benchmark_kernel(int N, float alpha, float beta) {
     cudaEventRecord(start);
 
     for (int i = 0; i < N_SAMPLES; ++i) {
-    	checkCuda(kernel(d_A, d_B, d_C, alpha, beta, N));
+    	kernel(d_A, d_B, d_C, alpha, beta, N);
     }
 
     cudaEventRecord(stop);
@@ -71,7 +71,7 @@ float benchmark_kernel(int N, float alpha, float beta) {
     cudaFreeHost(h_B);
     cudaFreeHost(h_C);
 
-	return ms;
+	return ms / N_SAMPLES;
 }
 
 
@@ -85,6 +85,10 @@ int main() {
 	for (int N : sizes) {
 		float runtime = benchmark_kernel(N, 1.0f, 0.0f);
 		kernel_results.push_back(runtime);
+	}
+
+	for (int i = 0; i < kernel_results.size(); i++) {
+		printf("%dx%d Matrix: %f ms (average)\n", sizes[i], sizes[i], kernel_results[i]);
 	}
 
 	return 0;
