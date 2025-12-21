@@ -1,6 +1,23 @@
+# CUDA intermediate files
 *.i
 *.ii
 *.gpu
 *.ptx
 *.cubin
 *.fatbin
+
+# Build directories
+build/
+cmake-build-*/
+
+# CMake cache files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Executables
+benchmark
+*.exe
+*.out
+*.app
