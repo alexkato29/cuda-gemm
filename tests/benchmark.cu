@@ -3,7 +3,8 @@
 #include <cstdlib>
 #include <cuda_runtime.h>
 
- #include "utils/generate_matrix.cuh"
+#include "utils/generate_matrix.cuh"
+#include "kernel.cuh"
 
 #define N_SAMPLES 10
 
@@ -20,53 +21,55 @@ float benchmark_kernel(int N, float alpha, float beta) {
 	const int BYTES = SIZE * sizeof(float);
 
 	float *h_A = nullptr, *h_B = nullptr, *h_C = nullptr;
-	checkCuda(cudaMallocHost(&h_A, BYTES));
-	checkCuda(cudaMallocHost(&h_B, BYTES));
-	checkCuda(cudaMallocHost(&h_C, BYTES));
+	cudaMallocHost(&h_A, BYTES);
+	cudaMallocHost(&h_B, BYTES);
+	cudaMallocHost(&h_C, BYTES);
+    checkCuda(cudaGetLastError());
 
-	generate_matrix(h_A, SIZE);
+    generate_matrix(h_A, SIZE);
 	generate_matrix(h_B, SIZE);
 	generate_matrix(h_C, SIZE);
 
 	float *d_A = nullptr, *d_B = nullptr, *d_C = nullptr;
-	checkCuda(cudaMalloc(&d_A, BYTES));
-    checkCuda(cudaMalloc(&d_B, BYTES));
-    checkCuda(cudaMalloc(&d_C, BYTES));
+	cudaMalloc(&d_A, BYTES);
+    cudaMalloc(&d_B, BYTES);
+    cudaMalloc(&d_C, BYTES);
+    checkCuda(cudaGetLastError());
 
-    checkCuda(cudaMemcpy(d_A, h_A, BYTES, cudaMemcpyHostToDevice));
-    checkCuda(cudaMemcpy(d_B, h_B, BYTES, cudaMemcpyHostToDevice));
-    checkCuda(cudaMemcpy(d_C, h_C, BYTES, cudaMemcpyHostToDevice));
+    cudaMemcpy(d_A, h_A, BYTES, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, h_B, BYTES, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_C, h_C, BYTES, cudaMemcpyHostToDevice);
+    checkCuda(cudaGetLastError());
 
     cudaEvent_t start, stop;
-    checkCuda(cudaEventCreate(&start));
-    checkCuda(cudaEventCreate(&stop));
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
-    // TODO: Run the kernel once to warm the cache
+    kernel(d_A, d_B, d_C, alpha, beta, N);
+    checkCuda(cudaDeviceSynchronize());
 
-    checkCuda(cudaEventRecord(start));
+    cudaEventRecord(start);
 
     for (int i = 0; i < N_SAMPLES; ++i) {
-    	// TODO: Actually run the kernel
-        continue;
+    	checkCuda(kernel(d_A, d_B, d_C, alpha, beta, N));
     }
 
-    checkCuda(cudaEventRecord(stop));
+    cudaEventRecord(stop);
     checkCuda(cudaEventSynchronize(stop));
 
     float ms = 0.0f;
-    checkCuda(cudaEventElapsedTime(&ms, start, stop));
-    ms /= N_SAMPLES;
+    cudaEventElapsedTime(&ms, start, stop);
 
-    checkCuda(cudaEventDestroy(start));
-    checkCuda(cudaEventDestroy(stop));
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 
-    checkCuda(cudaFree(d_A));
-    checkCuda(cudaFree(d_B));
-    checkCuda(cudaFree(d_C));
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
 
-    checkCuda(cudaFreeHost(h_A));
-    checkCuda(cudaFreeHost(h_B));
-    checkCuda(cudaFreeHost(h_C));
+    cudaFreeHost(h_A);
+    cudaFreeHost(h_B);
+    cudaFreeHost(h_C);
 
 	return ms;
 }
