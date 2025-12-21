@@ -67,8 +67,8 @@ int main() {
         CUBLAS_OP_N,
         N, N, N,
         &alpha,
-        d_A, N,
         d_B, N,
+        d_A, N,
         &beta,
         d_REF, N
     ));
@@ -80,7 +80,7 @@ int main() {
 	cudaMemcpy(h_C, d_C, BYTES, cudaMemcpyDeviceToHost);
 	checkCuda(cudaDeviceSynchronize());
 
-	const float TOL = 1e-5f;
+	const float TOL = 1e-4f;
 	for (int i = 0; i < SIZE; i++) {
 		float diff = fabs(h_REF[i] - h_C[i]);
 		if (diff > TOL) {

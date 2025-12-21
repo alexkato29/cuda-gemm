@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 set(KERNEL "cublas" CACHE STRING "Select which kernel implementation to benchmark")
 set_property(CACHE KERNEL PROPERTY STRINGS cublas)
 
-set(KERNEL_FILE "${PROJECT_SOURCE_DIR}/src/kernels/${KERNEL}.cu")
+set(KERNEL_FILE "${PROJECT_SOURCE_DIR}/src/kernels/${KERNEL}/${KERNEL}.cu")
 if(NOT EXISTS ${KERNEL_FILE})
     message(FATAL_ERROR "Kernel '${KERNEL}' not found at ${KERNEL_FILE}")
 endif()

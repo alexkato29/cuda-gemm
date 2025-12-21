@@ -23,7 +23,7 @@ void kernel(float* d_A, float* d_B, float* d_C, float alpha, float beta, int N) 
     dim3 gridDim((N + blockDim.x - 1) / blockDim.x, 
                  (N + blockDim.y - 1) / blockDim.y);
     
-    naive<<<gridDim, blockDim>>>(d_A, d_B, d_C, N);
+    naive<<<gridDim, blockDim>>>(d_A, d_B, d_C, alpha, beta, N);
 }
 
 
