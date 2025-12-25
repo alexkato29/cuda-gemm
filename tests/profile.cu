@@ -2,7 +2,6 @@
 #include <vector>
 #include <cstdlib>
 #include <cmath>
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
 
 #include "utils/generate_matrix.cuh"
@@ -16,18 +15,11 @@ static inline void checkCuda(cudaError_t e) {
 	}
 }
 
-static inline void checkCublas(cublasStatus_t status) {
-	if (status != CUBLAS_STATUS_SUCCESS) {
-		printf("cuBLAS error: %d\n", status);
-		std::exit(1);
-	}
-}
-
 
 int main(int argc, char** argv) {
 	int N = 128;
 	if (argc > 1) {
-		N = std::atoi(argv[1])
+		N = std::atoi(argv[1]);
 	}
 	printf("Profiling matrix size: %dx%d\n", N, N);
 
