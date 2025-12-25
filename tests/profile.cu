@@ -24,7 +24,13 @@ static inline void checkCublas(cublasStatus_t status) {
 }
 
 
-int main() {
+int main(int argc, char** argv) {
+	int N = 128;
+	if (argc > 1) {
+		N = std::atoi(argv[1])
+	}
+	printf("Profiling matrix size: %dx%d\n", N, N);
+
 	const int SIZE = N * N;
 	const int BYTES = SIZE * sizeof(float);
 	float alpha = 1.0f, beta = 1.0f;
