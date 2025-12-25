@@ -49,5 +49,5 @@ add_executable(profile
     tests/profile.cu
     ${KERNEL_FILE}
 )
-target_link_libraries(validate PRIVATE utils CUDA::cublas)
+target_link_libraries(profile PRIVATE utils CUDA::cublas)
 target_include_directories(profile PRIVATE ${PROJECT_SOURCE_DIR}/include)
