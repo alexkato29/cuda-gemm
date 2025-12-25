@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 set(KERNEL "cublas" CACHE STRING "Select which kernel implementation to benchmark")
 set_property(CACHE KERNEL PROPERTY STRINGS cublas)
 
-set(KERNEL_FILE "${PROJECT_SOURCE_DIR}/src/kernels/${KERNEL}.cu")
+set(KERNEL_FILE "${PROJECT_SOURCE_DIR}/src/kernels/${KERNEL}/${KERNEL}.cu")
 if(NOT EXISTS ${KERNEL_FILE})
     message(FATAL_ERROR "Kernel '${KERNEL}' not found at ${KERNEL_FILE}")
 endif()
@@ -44,3 +44,10 @@ add_executable(validate
 )
 target_link_libraries(validate PRIVATE utils CUDA::cublas)
 target_include_directories(validate PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
+add_executable(profile
+    tests/profile.cu
+    ${KERNEL_FILE}
+)
+target_link_libraries(profile PRIVATE utils)
+target_include_directories(profile PRIVATE ${PROJECT_SOURCE_DIR}/include)

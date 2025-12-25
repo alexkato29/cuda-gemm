@@ -51,7 +51,7 @@ float benchmark_kernel(int N, float alpha, float beta) {
     cudaEventRecord(start);
 
     for (int i = 0; i < N_SAMPLES; ++i) {
-    	kernel(d_A, d_B, d_C, alpha, beta, N);
+        kernel(d_A, d_B, d_C, alpha, beta, N);
     }
 
     cudaEventRecord(stop);

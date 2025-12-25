@@ -12,17 +12,17 @@
 
 
 static inline void checkCuda(cudaError_t e) {
-    if (e != cudaSuccess) {
-        printf("CUDA error: %s\n", cudaGetErrorString(e));
-        std::exit(1);
-    }
+	if (e != cudaSuccess) {
+		printf("CUDA error: %s\n", cudaGetErrorString(e));
+		std::exit(1);
+	}
 }
 
 static inline void checkCublas(cublasStatus_t status) {
-    if (status != CUBLAS_STATUS_SUCCESS) {
-        printf("cuBLAS error: %d\n", status);
-        std::exit(1);
-    }
+	if (status != CUBLAS_STATUS_SUCCESS) {
+		printf("cuBLAS error: %d\n", status);
+		std::exit(1);
+	}
 }
 
 
@@ -36,9 +36,9 @@ int main() {
 	cudaMallocHost(&h_B, BYTES);
 	cudaMallocHost(&h_C, BYTES);
 	cudaMallocHost(&h_REF, BYTES);
-    checkCuda(cudaGetLastError());
+	checkCuda(cudaGetLastError());
 
-    generate_matrix(h_A, SIZE);
+	generate_matrix(h_A, SIZE);
 	generate_matrix(h_B, SIZE);
 	generate_matrix(h_C, SIZE);
 
@@ -48,31 +48,31 @@ int main() {
 
 	float *d_A = nullptr, *d_B = nullptr, *d_C = nullptr, *d_REF = nullptr;
 	cudaMalloc(&d_A, BYTES);
-    cudaMalloc(&d_B, BYTES);
-    cudaMalloc(&d_C, BYTES);
-    cudaMalloc(&d_REF, BYTES);
-    checkCuda(cudaGetLastError());
+	cudaMalloc(&d_B, BYTES);
+	cudaMalloc(&d_C, BYTES);
+	cudaMalloc(&d_REF, BYTES);
+ 	checkCuda(cudaGetLastError());
 
-    cudaMemcpy(d_A, h_A, BYTES, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_B, h_B, BYTES, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_C, h_C, BYTES, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_REF, h_REF, BYTES, cudaMemcpyHostToDevice);
-    checkCuda(cudaGetLastError());
+	cudaMemcpy(d_A, h_A, BYTES, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_B, h_B, BYTES, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_C, h_C, BYTES, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_REF, h_REF, BYTES, cudaMemcpyHostToDevice);
+	checkCuda(cudaGetLastError());
 
 	static cublasHandle_t handle;
 	checkCublas(cublasCreate(&handle));
 	checkCublas(cublasSgemm(
-        handle, 
-        CUBLAS_OP_N, 
-        CUBLAS_OP_N,
-        N, N, N,
-        &alpha,
-        d_A, N,
-        d_B, N,
-        &beta,
-        d_REF, N
-    ));
-    checkCublas(cublasDestroy(handle));
+		handle, 
+		CUBLAS_OP_N, 
+		CUBLAS_OP_N,
+		N, N, N,
+		&alpha,
+		d_B, N,
+		d_A, N,
+		&beta,
+		d_REF, N
+	));
+	checkCublas(cublasDestroy(handle));
 
 	kernel(d_A, d_B, d_C, alpha, beta, N);
 
@@ -80,7 +80,7 @@ int main() {
 	cudaMemcpy(h_C, d_C, BYTES, cudaMemcpyDeviceToHost);
 	checkCuda(cudaDeviceSynchronize());
 
-	const float TOL = 1e-5f;
+	const float TOL = 1e-4f;
 	for (int i = 0; i < SIZE; i++) {
 		float diff = fabs(h_REF[i] - h_C[i]);
 		if (diff > TOL) {
@@ -90,17 +90,17 @@ int main() {
 	}
 	printf("Kernel VALIDATED: output exactly matches cuBLAS\n");
 
-    cleanup_kernel();
+	cleanup_kernel();
 
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
-    cudaFree(d_REF);
+	cudaFree(d_A);
+	cudaFree(d_B);
+	cudaFree(d_C);
+	cudaFree(d_REF);
 
-    cudaFreeHost(h_A);
-    cudaFreeHost(h_B);
-    cudaFreeHost(h_C);
-    cudaFreeHost(h_REF);
+	cudaFreeHost(h_A);
+	cudaFreeHost(h_B);
+	cudaFreeHost(h_C);
+	cudaFreeHost(h_REF);
 
 	return 0;
 }

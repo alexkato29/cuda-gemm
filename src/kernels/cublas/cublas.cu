@@ -20,15 +20,15 @@ void kernel(float* d_A, float* d_B, float* d_C, float alpha, float beta, int N) 
     }
 
     checkCublas(cublasSgemm(
-        g_handle, 
-        CUBLAS_OP_N, 
-        CUBLAS_OP_N,
-        N, N, N,
-        &alpha,
-        d_A, N,
-        d_B, N,
-        &beta,
-        d_C, N
+    g_handle, 
+    CUBLAS_OP_N, 
+    CUBLAS_OP_N,
+    N, N, N,
+    &alpha,
+    d_B, N,
+    d_A, N,
+    &beta,
+    d_C, N
     ));
 }
 
