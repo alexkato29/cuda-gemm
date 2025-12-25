@@ -21,3 +21,6 @@ benchmark
 *.exe
 *.out
 *.app
+
+# Scratchwork, Temp Outputs, & Notes
+temp/

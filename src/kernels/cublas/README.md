@@ -1,7 +1,9 @@
-q# Baseline: cuBLAS
+# Baseline: cuBLAS
 
 ### Strategy
 **cuBLAS** is the NVIDIA, closed-source imeplementation of GEMM. It is highly optimized and used as a baseline for this repository. Unfortunately, information on the full implementation is not known.
+
+cuBLAS will serve as the baseline throughout this repo. We aim to close the gap between our custom performance and cuBLAS.
 
 ### Benchmark Results
 ```
