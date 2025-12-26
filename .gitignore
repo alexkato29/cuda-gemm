@@ -24,3 +24,6 @@ benchmark
 
 # Scratchwork, Temp Outputs, & Notes
 temp/
+
+# Mac
+.DS_Store
