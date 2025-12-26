@@ -6,9 +6,9 @@
     - Warps are issuing 0.17 instructions per cycle, very far from the 1.0 theoretical max (Scheduler Statistics).
     - *This is the main bottleneck.*
 1. Warps are stalled waiting to issue their memory operations.
-	- Warps spend 37.9 out of their 47.16 cycles between instructions, on average, stalled waiting for the LG queue to free up (Warp State Statistics).
-    - The LG queue has very finite space, and as long as it's full warps can't even begin other independent operations. They must first get the load instruction in flight.
-1. Why is the LG queue saturated?
+	- Warps spend 37.9 out of their 47.16 cycles between instructions, on average, stalled waiting for the local/global memory instruction queue to free up (Warp State Statistics).
+    - The local/global memory instruction queue has finite space, and as long as it's full warps can't even begin other independent operations. They must first get the load instruction in flight.
+1. Why is the local/global memory instruction queue saturated?
 	- It must be either (1) we are reading too often or (2) reads are too expensive.
 1. Cache miss rate is modestly high.
 	- Cache misses occur 12.7% of the time (Memory Workload Analysis)
@@ -18,9 +18,9 @@
     - With a modest cache miss rate and many cache lines requested, the probability of at least one miss per load instruction dramatically increases.
 1. We experience many cache misses and queue pressure.
 	- Fetching values from DRAM and L2 take considerably longer, potentially 300-400 cycles.
-    - While that is happening, the memory instruction is stuck on the LG queue.
+    - While that is happening, the memory instruction is stuck on the instruction queue.
 
-**TLDR;** expensive memory reads lead to high LG queue pressure. Warps are stalled waiting for the LG queue to flush so they may issue subsequent instructions.
+**TLDR;** expensive memory reads lead to LG throttling. Warps are stalled waiting for the local/global memory instruction queue to flush so they may issue subsequent instructions.
 
 ## The Fix
 #### Make reads less expensive.
@@ -34,8 +34,8 @@ sum += d_A[row * N + i] * d_B[i * N + col];
 
 By shaping our blocks to `32x8`, we will now use *all 128 bytes per cache line* of `B` (32 floats × 4 bytes per float) and only request one cache line of `A` (only one `row` value per warp)!
 
-#### Push less to the LG queue.
-We reference global memory many times per thread. What if we can leverage *shared memory* to alleviate pressure on the L1 cache/DRAM and subsequently the LG queue? Shared memory is on chip and accessed very efficiently. It does *NOT* rely on LG queue, and its contents are guaranteed to be there at runtime. Plus, shared memory enables very efficient data reuse. This is especially valuable for our situation, where row and column reads are highly redundant (each row of `A` and col of `B` is read `N` times for an `NxN` matrix).
+#### Push less to the local/global memory instruction queue.
+We reference global memory many times per thread. But, we can leverage shared memory to alleviate pressure on the L1 cache/DRAM and subsequently the memory instruction queue. Shared memory is on chip and accessed very efficiently. It does *NOT* rely on local/global memory instruction queue, and its contents are guaranteed to be there at runtime. Plus, shared memory enables very efficient data reuse. This is especially valuable for our situation, where row and column reads are highly redundant (each row of `A` and col of `B` is read `N` times for an `NxN` matrix).
 
 ## The Evidence
 ```
