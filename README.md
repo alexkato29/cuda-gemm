@@ -2,7 +2,7 @@
 
 This repo walks through several implementations of ***single precision generalized matrix multiplication***, or just **SGEMM**. Each implementation aims to be increasingly optimized than the last.
 
-All kernels were profiled on a **NVIDIA T4 GPU** via Google Cloud Platform.
+All kernels were profiled on a **NVIDIA T4 GPU** via Google Cloud Platform. This was an educational project as I learn about the CUDA programming model.
 
 ## Repo Organization
 - `src/kernels/` - Different implementations of SGEMM kernels.
