@@ -33,7 +33,7 @@ __global__ void tiled(float* A, float* B, float* C, float alpha, float beta, int
 	}
 
 	if (row < N && col < N)
-		d_C[row * N + col] = d_C[row * N + col] * beta + sum * alpha;
+		C[row * N + col] = C[row * N + col] * beta + sum * alpha;
 }
 
 
@@ -43,4 +43,9 @@ void kernel(float* d_A, float* d_B, float* d_C, float alpha, float beta, int N) 
 			(N + blockDim.y - 1) / blockDim.y);
 
 	tiled<<<gridDim, blockDim>>>(d_A, d_B, d_C, alpha, beta, N);
+}
+
+
+void cleanup_kernel() {
+	return;
 }
