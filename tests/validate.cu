@@ -88,7 +88,7 @@ int main() {
 			std::exit(1);
 		}
 	}
-	printf("Kernel VALIDATED: output exactly matches cuBLAS\n");
+	printf("Kernel VALIDATED: output matches cuBLAS to 1e-4 tolerance\n");
 
 	cleanup_kernel();
 
