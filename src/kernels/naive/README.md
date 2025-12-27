@@ -16,7 +16,9 @@ Average Runtime per Matrix Size:
 2048x2048 Matrix: 38.661644 ms
 4096x4096 Matrix: 310.596100 ms
 ```
-**cuBLAS Factor (512+ Matrices): 9.4594x**
+#### Speedup Factors (on 512+ Matrices)
+cuBLAS: 0.107x
+Prev:   N/A
 
 ### What's Good?
 - Memory access in `B` is coalesced.

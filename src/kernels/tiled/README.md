@@ -19,8 +19,9 @@ Average Runtime per Matrix Size:
 2048x2048 Matrix: 24.659019 ms
 4096x4096 Matrix: 200.523956 ms
 ```
-**cuBLAS Factor (512+ Matrices): 5.4474x**
-**Runtime Reduction from Naive (512+ Matrices): 41.45%**
+#### Speedup Factors (on 512+ Matrices)
+cuBLAS: 0.1862x
+Naive:  1.7578x
 
 ### What's Good?
 - Tiling dramatically reduces the amount of global memory reads (1/16th as many loads issued in our code, theoretically).
@@ -28,6 +29,7 @@ Average Runtime per Matrix Size:
 - We have no bank conflicts in our shared memory access. 
     - `a_tile` accesses reference unique bank IDs altogether per warp.
     - `b_tile` accesses do request only 16 unique bank IDs per 32 threads. But, they request the same address, so the result can be broadcasted!
+- The compiler is *already vectorizing reads to `a_tile`!* See the bonus observations section.
 
 ### What's Bad?
 - We call shared memory so aggressively that it cannot serve reads as fast as they're coming in.
@@ -51,6 +53,7 @@ Average Runtime per Matrix Size:
 We currently issue one load instruction per float we want from shared memory. When retrieving a row or column of a matrix, ideally we can just get multiple values from that row or column under one instruction simultaneously. The load store units (LSUs) that actually fetch the shared memory *support this*. They have far more bandwidth than 4 bytes per instruction. 
 
 *What if we read multiple values per instruction over fewer total instructions?*
+**Note:** see the *Bonus Observations* section at the bottom of this `README.md`, but the compiler is smart enough to already do this (at least in part).
 
 #### Read from shared memory less frequently.
 Shared memory is faster than global memory, but it still takes a non-negligible amount of time. And, we still must repeatedly read the same rows and columns over and over again from shared. Ideally, we could read the shared memory values fewer times yet do more work per read.
@@ -224,6 +227,26 @@ Avg. Divergent Branches                          0
 ```
 
 ### Bonus Observations
+
+#### Two `__syncthreads()` Calls
+We synchronize threads within the block twice. The first time is straightforward. We must make sure shared memory is completely updated before we begin computing dot products. The second synchronization is necessary to prevent certain warps from racing ahead and beginning to update shared memory *again* before all threads have finished using the current shared memory values.
+
+#### Compiler is Already Vectorizing `a_tile` Loads
+If we compile the `./profile` binary and disasemble: `cuobjdump -sass ./profile > tiled_dump.txt` we see two particularly interesting block of instructions:
+```
+LDS.U R16, [R24] ;                             /* 0x0000000018107984 */
+LDS.U.128 R4, [R23] ;                          /* 0x0000000017047984 */
+LDS.U R18, [R24+0x40] ;                        /* 0x0000400018127984 */
+LDS.U R28, [R24+0x80] ;                        /* 0x00008000181c7984 */
+LDS.U R29, [R24+0xc0] ;                        /* 0x0000c000181d7984 */
+...
+FFMA R4, R16, R4, R19 ;                        /* 0x0000000410047223 */
+FFMA R5, R18, R5, R4 ;                         /* 0x0000000512057223 */
+FFMA R6, R28, R6, R5 ;                         /* 0x000000061c067223 */
+FFMA R7, R29, R7, R6 ;                         /* 0x000000071d077223 */
+```
+I've removed a few in between lines, but this section is reading memory from `a_tile` (register `R23`) and `b_tile` (register `R24`). When we read from `a_tile`, observe we use the instruction `LDS.U.128`. This is reading 128 bits from memory, or 16 bytes, or *4 floats* simultaneously. It's already vectorized and using a wide load with one instruction! The compiler is smart.
+
 #### DRAM Throughput Increased
 We observe that DRAM throughput increases from the naive kernel, despite making 1/16th as many global memory calls. Seems counterintuitive, but this can be explained by the L1/TEX cache hit rate. While for naive it was nearly 90%, it has dropped to <1% in the new tiled kernel! We issue less loads from global memory, but now they almost always miss in L1 and end up in L2 and (half the time) all the way in DRAM.
 
