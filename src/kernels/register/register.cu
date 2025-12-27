@@ -63,8 +63,8 @@ __global__ void register_tiled(float* A, float* B, float* C, float alpha, float 
 
 void kernel(float* d_A, float* d_B, float* d_C, float alpha, float beta, int N) {
 	dim3 blockDim(BLOCK_DIM, BLOCK_DIM);
-	dim3 gridDim((N + blockDim.x - 1) / blockDim.x,
-			(N + blockDim.y - 1) / blockDim.y);
+	dim3 gridDim((N + blockDim.x - 1) / blockDim.x / COARSE_DIM,
+			(N + blockDim.y - 1) / blockDim.y / COARSE_DIM);
 
 	register_tiled<<<gridDim, blockDim>>>(d_A, d_B, d_C, alpha, beta, N);
 }
