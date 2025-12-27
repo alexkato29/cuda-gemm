@@ -19,8 +19,9 @@ Average Runtime per Matrix Size:
 2048x2048 Matrix: 24.659019 ms
 4096x4096 Matrix: 200.523956 ms
 ```
-**cuBLAS Factor (512+ Matrices): 5.4474x**
-**Runtime Reduction from Naive (512+ Matrices): 41.45%**
+#### Speedup Factors (on 512+ Matrices)
+cuBLAS: 0.1862x
+Naive:  1.7578x
 
 ### What's Good?
 - Tiling dramatically reduces the amount of global memory reads (1/16th as many loads issued in our code, theoretically).
