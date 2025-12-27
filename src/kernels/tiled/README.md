@@ -52,6 +52,7 @@ Average Runtime per Matrix Size:
 We currently issue one load instruction per float we want from shared memory. When retrieving a row or column of a matrix, ideally we can just get multiple values from that row or column under one instruction simultaneously. The load store units (LSUs) that actually fetch the shared memory *support this*. They have far more bandwidth than 4 bytes per instruction. 
 
 *What if we read multiple values per instruction over fewer total instructions?*
+**Note:** see the *Bonus Observations* section at the bottom of this `README.md`, but the compiler is smart enough to already do this (at least in part).
 
 #### Read from shared memory less frequently.
 Shared memory is faster than global memory, but it still takes a non-negligible amount of time. And, we still must repeatedly read the same rows and columns over and over again from shared. Ideally, we could read the shared memory values fewer times yet do more work per read.
@@ -226,7 +227,10 @@ Avg. Divergent Branches                          0
 
 ### Bonus Observations
 
-#### Compiler is Vectorizing
+#### Two `__syncthreads()` Calls
+We synchronize threads within the block twice. The first time is straightforward. We must make sure shared memory is completely updated before we begin computing dot products. The second synchronization is necessary to prevent certain warps from racing ahead and beginning to update shared memory *again* before all threads have finished using the current shared memory values.
+
+#### Compiler is Already Vectorizing `a_tile` Loads
 If we compile the `./profile` binary and disasemble: `cuobjdump -sass ./profile > tiled_dump.txt` we see two particularly interesting block of instructions:
 ```
 LDS.U R16, [R24] ;                             /* 0x0000000018107984 */
