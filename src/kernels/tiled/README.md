@@ -28,6 +28,7 @@ Average Runtime per Matrix Size:
 - We have no bank conflicts in our shared memory access. 
     - `a_tile` accesses reference unique bank IDs altogether per warp.
     - `b_tile` accesses do request only 16 unique bank IDs per 32 threads. But, they request the same address, so the result can be broadcasted!
+- The compiler is *already vectorizing reads to `a_tile`!* See the bonus observations section.
 
 ### What's Bad?
 - We call shared memory so aggressively that it cannot serve reads as fast as they're coming in.
@@ -224,6 +225,23 @@ Avg. Divergent Branches                          0
 ```
 
 ### Bonus Observations
+
+#### Compiler is Vectorizing
+If we compile the `./profile` binary and disasemble: `cuobjdump -sass ./profile > tiled_dump.txt` we see two particularly interesting block of instructions:
+```
+LDS.U R16, [R24] ;                             /* 0x0000000018107984 */
+LDS.U.128 R4, [R23] ;                          /* 0x0000000017047984 */
+LDS.U R18, [R24+0x40] ;                        /* 0x0000400018127984 */
+LDS.U R28, [R24+0x80] ;                        /* 0x00008000181c7984 */
+LDS.U R29, [R24+0xc0] ;                        /* 0x0000c000181d7984 */
+...
+FFMA R4, R16, R4, R19 ;                        /* 0x0000000410047223 */
+FFMA R5, R18, R5, R4 ;                         /* 0x0000000512057223 */
+FFMA R6, R28, R6, R5 ;                         /* 0x000000061c067223 */
+FFMA R7, R29, R7, R6 ;                         /* 0x000000071d077223 */
+```
+I've removed a few in between lines, but this section is reading memory from `a_tile` (register `R23`) and `b_tile` (register `R24`). When we read from `a_tile`, observe we use the instruction `LDS.U.128`. This is reading 128 bits from memory, or 16 bytes, or *4 floats* simultaneously. It's already vectorized and using a wide load with one instruction! The compiler is smart.
+
 #### DRAM Throughput Increased
 We observe that DRAM throughput increases from the naive kernel, despite making 1/16th as many global memory calls. Seems counterintuitive, but this can be explained by the L1/TEX cache hit rate. While for naive it was nearly 90%, it has dropped to <1% in the new tiled kernel! We issue less loads from global memory, but now they almost always miss in L1 and end up in L2 and (half the time) all the way in DRAM.
 
