@@ -13,7 +13,7 @@ All kernels were profiled on a **NVIDIA T4 GPU** via Google Cloud Platform. This
 The `CMakeLists` file allows for easy repo compilation via
 ```
 // Creates the build/ directory and makefile for compilation
-mkdir build && cmake -B build -DKERNEL=<target kernel>
+mkdir build && cmake -B build -DKERNEL_PATH=<path to kernel>
 
 // Compiles the benchmark, validation, and profiling scripts
 cd build && make 
