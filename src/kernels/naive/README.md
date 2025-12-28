@@ -1,4 +1,4 @@
-# Iteration 0: Naive Dot Product
+# Iteration 0: Dot Product per Thread
 
 ### Strategy
 We let each thread compute one element of the output matrix `C = A @ B`. Each thread with index $(x, y)$ will:
@@ -17,8 +17,10 @@ Average Runtime per Matrix Size:
 4096x4096 Matrix: 310.596100 ms
 ```
 #### Speedup Factors (on 512+ Matrices)
+```
 cuBLAS: 0.107x
-Prev:   N/A
+Prev:      N/A
+```
 
 ### What's Good?
 - Memory access in `B` is coalesced.
