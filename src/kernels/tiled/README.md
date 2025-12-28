@@ -1,11 +1,11 @@
-# Iteration 1: Tiled Matrix Multiplication
+# Iteration 1: Shared Memory Utilization
 
 ### Strategy
 Just as the naive implementation, we still are using each thread to compute one output element via a dot product. But, the memory access pattern changes. Rather than fetching a row and a column from global memory for each output element, we can take advantage of repeated access.
 
 Consider output elements $C_{0,0}$ and $C_{0, 1}$. To compute either element require fetching the first row of $A$. Rather than doing this twice independently, we can utilize *shared memory* to fetch this row a single time.
 
-We divide our output matrix $C$ into `16x16` (we could have chosen a different size, this was arbitrary) tiles. For each tile, we fetch the corresponding 16 rows of `A` and 16 columns of `B` one time and store them in shared memory. 
+We divide our output matrix $C$ into `16x16` (we could have chosen a different size, this was arbitrary) tiles. For each tile, we fetch the corresponding 16 rows of `A` and 16 columns of `B` one time and store them in shared memory.
 
 After this cooperative load, we may efficiently reuse the rows and columns from shared memory, which is substantially faster to read from. It also has a separate memory instruction queue from local/global memory, removing the bottleneck of the naive kernel.
 
@@ -20,13 +20,15 @@ Average Runtime per Matrix Size:
 4096x4096 Matrix: 200.523956 ms
 ```
 #### Speedup Factors (on 512+ Matrices)
+```
 cuBLAS: 0.1862x
 Naive:  1.7578x
+```
 
 ### What's Good?
 - Tiling dramatically reduces the amount of global memory reads (1/16th as many loads issued in our code, theoretically).
 - Pressure on the local/global memory instruction queue is no longer a primary bottleneck.
-- We have no bank conflicts in our shared memory access. 
+- We have no bank conflicts in our shared memory access.
     - `a_tile` accesses reference unique bank IDs altogether per warp.
     - `b_tile` accesses do request only 16 unique bank IDs per 32 threads. But, they request the same address, so the result can be broadcasted!
 - The compiler is *already vectorizing reads to `a_tile`!* See the bonus observations section.
@@ -50,7 +52,7 @@ Naive:  1.7578x
 
 ### In-Depth Fix Ideas
 #### Use fewer but wider memory loads.
-We currently issue one load instruction per float we want from shared memory. When retrieving a row or column of a matrix, ideally we can just get multiple values from that row or column under one instruction simultaneously. The load store units (LSUs) that actually fetch the shared memory *support this*. They have far more bandwidth than 4 bytes per instruction. 
+We currently issue one load instruction per float we want from shared memory. When retrieving a row or column of a matrix, ideally we can just get multiple values from that row or column under one instruction simultaneously. The load store units (LSUs) that actually fetch the shared memory *support this*. They have far more bandwidth than 4 bytes per instruction.
 
 *What if we read multiple values per instruction over fewer total instructions?*
 **Note:** see the *Bonus Observations* section at the bottom of this `README.md`, but the compiler is smart enough to already do this (at least in part).
