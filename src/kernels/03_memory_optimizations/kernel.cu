@@ -5,7 +5,7 @@
 #define COARSE_DIM 4
 
 
-__global__ void register_tiled(float* A, float* B, float* C, float alpha, float beta, int N) {
+__global__ void memory_optimize(float* A, float* B, float* C, float alpha, float beta, int N) {
 	int thread_tile_row_base = threadIdx.y * COARSE_DIM;
 	int thread_tile_col_base = threadIdx.x * COARSE_DIM;
 
@@ -33,7 +33,6 @@ __global__ void register_tiled(float* A, float* B, float* C, float alpha, float 
 				int b_row = row_within_tile + tile_idx * TILE_DIM;
 				int b_col = col_within_tile + block_base_col;
 
-				// TODO: Writes have bank conflicts. Must write 32 consecutive
 				// TODO: Vectorize these memory accesses. A can probably be vectorized easily, maybe not B?
 				// Basically, should be able to read a float4 and immediately copy it to shared memory for x4 throughput?
 				if (a_col < N && a_row < N)
@@ -63,7 +62,7 @@ __global__ void register_tiled(float* A, float* B, float* C, float alpha, float 
 		__syncthreads();
 	}
 
-	// TODO: Vectorize the writes.
+	// TODO: Vectorize the writes. 
 	int row = block_base_row + thread_tile_row_base;
 	int col = block_base_col + thread_tile_col_base;
 	for (int cx = 0; cx < COARSE_DIM; cx++)
@@ -85,7 +84,7 @@ void kernel(float* d_A, float* d_B, float* d_C, float alpha, float beta, int N) 
 	dim3 gridDim((N + TILE_DIM - 1) / TILE_DIM,
 			(N + TILE_DIM - 1) / TILE_DIM);
 
-	register_tiled<<<gridDim, blockDim>>>(d_A, d_B, d_C, alpha, beta, N);
+	memory_optimize<<<gridDim, blockDim>>>(d_A, d_B, d_C, alpha, beta, N);
 }
 
 
