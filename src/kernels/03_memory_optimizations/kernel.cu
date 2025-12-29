@@ -1,93 +1,101 @@
 #include "kernel.cuh"
 
-#define BLOCK_DIM 16
-#define TILE_DIM 64
-#define COARSE_DIM 4
 
+template <const int SHARED_M, const int SHARED_K, const int SHARED_N, const int OUT_M, const int OUT_N>
+__global__ void memory_optimize(int M, int N, int K, float* A, float* B, float* C, float alpha, float beta) {
+	// Technically this is fine. I as the programmer control OUT_N.
+	static_assert(OUT_N % 4 == 0, "OUT_N must be a multiple of 4 for vectorized B loads and float4 C stores.");
 
-__global__ void memory_optimize(float* A, float* B, float* C, float alpha, float beta, int N) {
-	int thread_tile_row_base = threadIdx.y * COARSE_DIM;
-	int thread_tile_col_base = threadIdx.x * COARSE_DIM;
+	float sums[OUT_M][OUT_N] = {0.0f};
+	float reg_a[OUT_M];
+	float reg_b[OUT_N];
 
-	int block_base_row = blockIdx.y * TILE_DIM;
-	int block_base_col = blockIdx.x * TILE_DIM;
+	__shared__ float a_tile[SHARED_M][SHARED_K];
+	__shared__ float b_tile[SHARED_K][SHARED_N];
 
-	// TODO: Optimize the size here to make shared memory fit more warps occupancy??? Do this last probably...
-	__shared__ float a_tile[TILE_DIM][TILE_DIM];
-	__shared__ float b_tile[TILE_DIM][TILE_DIM];
+	// Determine the base row of A and column of B that this block is responsible for
+	int base_a_row = blockIdx.y * SHARED_M;
+	int base_b_col = blockIdx.x * SHARED_N;
 
-	float sums[COARSE_DIM][COARSE_DIM] = {0.0f};
-	float reg_a[COARSE_DIM];
-	float reg_b[COARSE_DIM];
+	// The exact row/col this thread maps to in SMEM
+	int thread_row_within_smem = threadIdx.x / (SHARED_N / OUT_N) * OUT_M;
+	int thread_col_within_smem = (threadIdx.x % (SHARED_N / OUT_N)) * OUT_N;
 
-	for (int tile_idx = 0; tile_idx < (N + TILE_DIM - 1) / TILE_DIM; tile_idx++) {
-		for (int row_offset_in_tile = 0; row_offset_in_tile < TILE_DIM; row_offset_in_tile += 8) {
-			for (int col_offset_in_tile = 0; col_offset_in_tile < TILE_DIM; col_offset_in_tile += 32) {
-				int thread_idx = threadIdx.y * 16 + threadIdx.x;
-				int row_within_tile = (thread_idx / 32) + row_offset_in_tile;
-				int col_within_tile = (thread_idx % 32) + col_offset_in_tile;
+	int a_tile_float4s = SHARED_M * SHARED_K / 4;
+	int b_tile_float4s = SHARED_K * SHARED_N / 4;
 
-				int a_col = col_within_tile + tile_idx * TILE_DIM;
-				int a_row = row_within_tile + block_base_row;
+	for (int tile_idx = 0; tile_idx < K; tile_idx += SHARED_K) {
+		for (int idx = threadIdx.x; idx < a_tile_float4s; idx += blockDim.x) {
+			int a_tile_row = idx / (SHARED_K / 4);
+			int a_tile_col = (idx % (SHARED_K / 4)) * 4;
+			int a_coord = (base_a_row + a_tile_row) * K + tile_idx + a_tile_col;
 
-				int b_row = row_within_tile + tile_idx * TILE_DIM;
-				int b_col = col_within_tile + block_base_col;
+			reinterpret_cast<float4 *>(&a_tile[a_tile_row][a_tile_col])[0] = 
+				reinterpret_cast<float4 *>(&A[a_coord])[0];
+		}
 
-				// TODO: Vectorize these memory accesses. A can probably be vectorized easily, maybe not B?
-				// Basically, should be able to read a float4 and immediately copy it to shared memory for x4 throughput?
-				if (a_col < N && a_row < N)
-					a_tile[row_within_tile][col_within_tile] = A[a_row * N + a_col];
-				else
-					a_tile[row_within_tile][col_within_tile] = 0.0f;
+		for (int idx = threadIdx.x; idx < b_tile_float4s; idx += blockDim.x) {
+			int b_tile_row = idx / (SHARED_N / 4);
+			int b_tile_col = (idx % (SHARED_N / 4)) * 4;
+			int b_coord = (tile_idx + b_tile_row) * N + base_b_col + b_tile_col;
 
-				if (b_row < N && b_col < N)
-					b_tile[row_within_tile][col_within_tile] = B[b_row * N + b_col];
-				else
-					b_tile[row_within_tile][col_within_tile] = 0.0f;
-			}
+			reinterpret_cast<float4 *>(&b_tile[b_tile_row][b_tile_col])[0] = 
+				reinterpret_cast<float4 *>(&B[b_coord])[0];
 		}
 		__syncthreads();
 
-		// TODO: Vectorize these loads (involves transposing B)
-		for (int i = 0; i < TILE_DIM; i++) {
-			for (int j = 0; j < COARSE_DIM; j++) {
-				reg_a[j] = a_tile[thread_tile_row_base + j][i];
-				reg_b[j] = b_tile[i][thread_tile_col_base + j];
+		// TODO: Can these be vectorized? If TM/TN aren't multiples of 4, they probably cannot...
+		#pragma unroll
+		for (int k = 0; k < SHARED_K; k++) {
+			#pragma unroll
+			for (int i = 0; i < OUT_M; i++)
+				// These are actually broadcasted. Because of warp geometry, we are changing columns. This isn't a conflict.
+				reg_a[i] = a_tile[thread_row_within_smem + i][k];
+			#pragma unroll
+			for (int i = 0; i < OUT_N; i += 4) {
+				float4 b_vec = reinterpret_cast<float4*>(&b_tile[k][thread_col_within_smem + i])[0];
+				reg_b[i + 0] = b_vec.x;
+				reg_b[i + 1] = b_vec.y;
+				reg_b[i + 2] = b_vec.z;
+				reg_b[i + 3] = b_vec.w;
 			}
-
-			for (int cx = 0; cx < COARSE_DIM; cx++)
-				for (int cy = 0; cy < COARSE_DIM; cy++)
+			#pragma unroll
+			for (int cx = 0; cx < OUT_N; cx++)
+				#pragma unroll
+				for (int cy = 0; cy < OUT_M; cy++)
 					sums[cy][cx] += reg_a[cy] * reg_b[cx];
 		}
 		__syncthreads();
-	}
+	}	
 
-	// TODO: Vectorize the writes. 
-	int row = block_base_row + thread_tile_row_base;
-	int col = block_base_col + thread_tile_col_base;
-	for (int cx = 0; cx < COARSE_DIM; cx++)
-		for (int cy = 0; cy < COARSE_DIM; cy++) {
-			int row_within_c = row + cy;
-			int col_within_c = col + cx;
-			if (row_within_c < N && col_within_c < N) {
-				if (beta == 0.0f)
-					C[row_within_c * N + col_within_c] = alpha * sums[cy][cx];
-				else
-					C[row_within_c * N + col_within_c] = alpha * sums[cy][cx] + beta * C[row_within_c * N + col_within_c];
-			}
+	int base_out_row = base_a_row + thread_row_within_smem;
+	int base_out_col = base_b_col + thread_col_within_smem;
+	for (int tile_m = 0; tile_m < OUT_M; tile_m += 1) {
+		int row = base_out_row + tile_m;
+		for (int tile_n = 0; tile_n < OUT_N; tile_n += 4) {
+			int col = base_out_col + tile_n;
+			float4 c_vec = reinterpret_cast<float4*>(&C[row * N + col])[0];
+			c_vec.x = alpha * sums[tile_m][tile_n + 0] + beta * c_vec.x;
+			c_vec.y = alpha * sums[tile_m][tile_n + 1] + beta * c_vec.y;
+			c_vec.z = alpha * sums[tile_m][tile_n + 2] + beta * c_vec.z;
+			c_vec.w = alpha * sums[tile_m][tile_n + 3] + beta * c_vec.w;
+			reinterpret_cast<float4*>(&C[row * N + col])[0] = c_vec;
 		}
+	}
 }
 
 
 void kernel(float* d_A, float* d_B, float* d_C, float alpha, float beta, int N) {
-	dim3 blockDim(BLOCK_DIM, BLOCK_DIM);
-	dim3 gridDim((N + TILE_DIM - 1) / TILE_DIM,
-			(N + TILE_DIM - 1) / TILE_DIM);
+	const int SM = 128;
+	const int SN = 128;
+	const int SK = 8;
+	const int OM = 8;
+	const int ON = 8;
 
-	memory_optimize<<<gridDim, blockDim>>>(d_A, d_B, d_C, alpha, beta, N);
+	dim3 blockDim((SM * SN) / (OM * ON));
+	dim3 gridDim((N + SN - 1) / SN, (N + SM - 1) / SM);
+
+	memory_optimize<SM, SK, SN, OM, ON><<<gridDim, blockDim>>>(N, N, N, d_A, d_B, d_C, alpha, beta);
 }
 
-
-void cleanup_kernel() {
-	return;
-}
+void cleanup_kernel() { return; }
