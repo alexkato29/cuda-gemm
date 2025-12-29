@@ -29,7 +29,8 @@ Average Runtime per Matrix Size:
 #### Speedup Factors (on 512+ Matrices)
 ```
 cuBLAS: 0.5747x
-Naive:  3.1400x
+Naive:  5.3889x
+Prev:   3.1400x
 ```
 
 ### What's Good?

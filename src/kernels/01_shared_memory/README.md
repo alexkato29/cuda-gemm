@@ -23,6 +23,7 @@ Average Runtime per Matrix Size:
 ```
 cuBLAS: 0.1862x
 Naive:  1.7578x
+Prev:   N/A
 ```
 
 ### What's Good?
