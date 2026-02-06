@@ -18,8 +18,8 @@ __global__ void memory_optimize(int M, int N, int K, float* A, float* B, float* 
 	int base_b_col = blockIdx.x * SHARED_N;
 
 	// The exact row/col this thread maps to in SMEM
-	int thread_row_within_smem = threadIdx.x / (SHARED_N / OUT_N) * OUT_M;
-	int thread_col_within_smem = (threadIdx.x % (SHARED_N / OUT_N)) * OUT_N;
+	int thread_row_within_smem = threadIdx.x / (SHARED_M / OUT_M) * OUT_M;    // 2 unique vals per warp
+	int thread_col_within_smem = (threadIdx.x % (SHARED_N / OUT_N)) * OUT_N;  // 16 unique vals per warp
 
 	int a_tile_float4s = SHARED_M * SHARED_K / 4;
 	int b_tile_float4s = SHARED_K * SHARED_N / 4;
@@ -30,6 +30,8 @@ __global__ void memory_optimize(int M, int N, int K, float* A, float* B, float* 
 			int a_tile_col = (idx % (SHARED_K / 4)) * 4;
 			int a_coord = (base_a_row + a_tile_row) * K + tile_idx + a_tile_col;
 
+			// So, while this store shouldn't have bank conflicts, the profiler says it does?
+			// I think it might be a profiler oddity. See readme.
 			reinterpret_cast<float4 *>(&a_tile[a_tile_row][a_tile_col])[0] = 
 				reinterpret_cast<float4 *>(&A[a_coord])[0];
 		}
@@ -44,15 +46,20 @@ __global__ void memory_optimize(int M, int N, int K, float* A, float* B, float* 
 		}
 		__syncthreads();
 
-		// TODO: Can these be vectorized? If TM/TN aren't multiples of 4, they probably cannot...
 		#pragma unroll
 		for (int k = 0; k < SHARED_K; k++) {
 			#pragma unroll
 			for (int i = 0; i < OUT_M; i++)
-				// These are actually broadcasted. Because of warp geometry, we are changing columns. This isn't a conflict.
+				/* We linearized threads, so they mostly share thread_row_within_smem values.
+				This is actually a broadcast in disguise. Not a perfect one, but a
+				(32 / (SHARED_M / OUT_M)) way conflict. Far less than a 32 way conflict...*/
 				reg_a[i] = a_tile[thread_row_within_smem + i][k];
 			#pragma unroll
 			for (int i = 0; i < OUT_N; i += 4) {
+				/* This is actually a WORSE bank conflict than the a_tile read. thread_col_within_smem
+				has 16 unique values per warp, incrementing by OUT_N. Broadcasting makes the overlap 
+				efficient, but the OUT_N increment is problematic. We only use 32 / OUT_N unique banks. 
+				In this case, a 4.0 way conflict! */
 				float4 b_vec = reinterpret_cast<float4*>(&b_tile[k][thread_col_within_smem + i])[0];
 				reg_b[i + 0] = b_vec.x;
 				reg_b[i + 1] = b_vec.y;
@@ -88,7 +95,7 @@ __global__ void memory_optimize(int M, int N, int K, float* A, float* B, float* 
 void kernel(float* d_A, float* d_B, float* d_C, float alpha, float beta, int N) {
 	const int SM = 128;
 	const int SN = 128;
-	const int SK = 8;
+	const int SK = 32;
 	const int OM = 8;
 	const int ON = 8;
 
